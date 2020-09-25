@@ -3108,8 +3108,9 @@ class BinaryLane():
         self.df.set_index(keys=self.key,
                           inplace=True)
 
-        self.yvals = pd.Series(data=y_resampled, index=self.df.index,
-                               name=self.y)
+        self.yvals = pd.Series(data=y_resampled, name=self.y)
+
+        self.yvals.index = self.df.index
 
         self.df.sort_index(inplace=True)
         self.yvals.sort_index(inplace=True)

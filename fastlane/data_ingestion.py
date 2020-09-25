@@ -720,6 +720,6 @@ def ddfs2df_append(dict_df, tuple_of_joins, df_return=True, df_2pickle=False,
 def pandas_profiling(df, pathname):
 
     profile = pp.ProfileReport(df)
-    profile.to_file(outputfile=pathname)
+    profile.to_file(pathname)
 
     print('Pd_Profiling_Report' + ' exported in ' + pathname)
