@@ -131,6 +131,7 @@ class BinaryLane():
         self.df = df.drop(columns=y).sort_index().copy()
         self.y = y
         self.yvals = df[y].sort_index().copy()
+        self._prod_array = {}
         inp_dict_cols = inp_dict_cols.copy()
 
         pandas_dtypes = ['key', 'fmtcategory', 'fmtordcategory',
@@ -1585,7 +1586,8 @@ class BinaryLane():
     # Inner Function - Encoding intenal function
     def _set_encode(self, encoder, columns, enc_type='standard',
                     n_splits=5,
-                    apply2test=False):
+                    apply2test=False,
+                    func_name=''):
         """
          Inner method of the class for managing two encoding types :
              'standard' : simple category encoder fit_transform method
@@ -1636,6 +1638,8 @@ class BinaryLane():
 
                 self.df.sort_index(inplace=True)
                 self.dftest.sort_index(inplace=True)
+
+        self._prod_array[func_name] = {'encoder': encoder}
 
     # Inner Function - Handling One Hot Encoding Exception
     def _get_onehotenc_dictcols(self, cols_orig):
@@ -1920,7 +1924,7 @@ class BinaryLane():
                 columns2keep = columns2keep + self.dict_cols[key]
 
         else:
-            
+
             columns2keep = col_lists[:]
 
         columnstot = []
@@ -2146,7 +2150,10 @@ class BinaryLane():
         columns = self.fmtcat_high
         cols_orig = self.df.columns
 
-        self._set_encode(encoder, columns, enc_type, n_splits, apply2test)
+        function = 'encode_cathigh_set'
+
+        self._set_encode(encoder, columns, enc_type, n_splits, apply2test,
+                         func_name=function)
 
         ohe_dict = self._get_onehotenc_dictcols(cols_orig)
 
@@ -2199,7 +2206,10 @@ class BinaryLane():
         columns = self.fmtcat_low
         cols_orig = self.df.columns
 
-        self._set_encode(encoder, columns, enc_type, n_splits, apply2test)
+        function = 'encode_catlow_set'
+
+        self._set_encode(encoder, columns, enc_type, n_splits, apply2test,
+                         func_name=function)
 
         ohe_dict = self._get_onehotenc_dictcols(cols_orig)
 
@@ -2252,7 +2262,10 @@ class BinaryLane():
         columns = self.fmtordcategory
         cols_orig = self.df.columns
 
-        self._set_encode(encoder, columns, enc_type, n_splits, apply2test)
+        function = 'encode_catord_set'
+
+        self._set_encode(encoder, columns, enc_type, n_splits, apply2test,
+                         func_name=function)
 
         ohe_dict = self._get_onehotenc_dictcols(cols_orig)
 
@@ -2453,6 +2466,8 @@ class BinaryLane():
                                     setslot)
             return
 
+        func_name = 'engineer_missing_set'
+
         # Replace int value with nan
         self.df[self.fmtint] = self.df[
                 self.fmtint].astype('Int32').replace(replace_intnan, np.nan)
@@ -2478,6 +2493,8 @@ class BinaryLane():
         print('\n')
         print('The integer value : ' + str(replace_intnan) +
               ' has been set to nan')
+
+        self._prod_array[func_name] = {'replace_intnan': replace_intnan}
 
     # Smooth Outlier
     def engineer_smooth_outlier(self, col_lists=['fmtfloat', 'fmtint'],
@@ -2524,6 +2541,8 @@ class BinaryLane():
                                     dict_locals,
                                     setslot)
             return
+
+        func_name = 'engineer_smooth_outlier'
 
         columns = self._apply_columns(col_lists, mode)
         counter = 0
@@ -2574,6 +2593,10 @@ class BinaryLane():
         if counter == 0:
 
             print('None of the dataframe have been smoothed.')
+
+        self._prod_array[func_name] = {'columns': columns,
+                                       'upper': upper,
+                                       'lower': lower}
 
         if returns:
             return self.df[np.sort(self.df.columns)]
@@ -2633,6 +2656,8 @@ class BinaryLane():
                                     setslot)
             return
 
+        func_name = 'engineer_standardize'
+
         columns = self._apply_columns(col_lists, mode)
 
         scaler = StandardScaler()
@@ -2650,6 +2675,9 @@ class BinaryLane():
         # Outcome Message
         print('\n')
         print(str(len(columns)) + ' columns have been standardized')
+
+        self._prod_array[func_name] = {'columns': columns,
+                                       'scaler': scaler}
 
         if returns:
             return self.df
@@ -2711,6 +2739,8 @@ class BinaryLane():
                                     setslot)
             return
 
+        func_name = 'engineer_missing_imputer'
+
         columns = self._apply_columns(col_lists, mode)
 
         if apply2plot:
@@ -2739,6 +2769,17 @@ class BinaryLane():
             if returns:
                 return (self.df[np.sort(self.df.columns)],
                         self.dftest[np.sort(self.dftest.columns)])
+
+        try:
+
+            self._prod_array[func_name] = self._prod_array[func_name] + \
+                [{'columns': columns,
+                  'imputer': imputer}]
+
+        except Exception:
+
+            self._prod_array[func_name] = [{'columns': columns,
+                                            'imputer': imputer}]
 
         if returns:
             return self.df
@@ -7177,3 +7218,98 @@ class BinaryLane():
 
         self.schedule_argvalues[0][0] = df.copy()
         self.schedule_argvalues[0][2] = dict_cols.copy()
+
+    # Load production table
+    def production_df_load(self, df, cols2keep=True):
+        """Load the production table."""
+        self.dfprod = df.copy()
+
+        if cols2keep:
+
+            columns = [col for col in self.df.columns]
+            self.dfprod = self.dfprod.loc[:, columns].copy()
+
+    # Encode the production table
+    def production_encode_set(self, encoder):
+        """Encode the production table."""
+        self.dfprod = encoder.transform(self.dfprod).sort_index().copy()
+
+    # Set int nan for production table
+    def production_missing_set(self, replace_intnan):
+        """Set int nan for production table."""
+        self.dfprod[self.fmtint] = self.dfprod[
+            self.fmtint].astype('Int32').replace(replace_intnan, np.nan)
+
+    # Smooth Outlier to production table
+    def production_smooth_outlier(self, columns, upper, lower):
+        """Smooth Outlier to production table."""
+        for col in columns:
+
+            self.dfprod[col] = np.where(
+                self.dfprod[col] > upper, upper,
+                self.dfprod[col])
+
+            self.dfprod[col] = np.where(
+                self.dfprod[col] < lower, lower,
+                self.dfprod[col])
+
+    # Standardize production table
+    def production_standardize(self, columns, scaler):
+        """Standardize production table."""
+        self.dfprod[columns] = scaler.transform(self.dfprod[columns])
+
+    # Impute missing to production table
+    def production_missing_imputer(self, columns, imputer):
+        """Impute missing to production table."""
+        self.dfprod[columns] = imputer.transform(self.dfprod[columns])
+
+    # Predict production table
+    def production_model_predict(self):
+        """Impute missing to production table."""
+        for key, value in self.best_model.items():
+
+            classifier = value[0]
+
+        self.dfprod['ypredict'] = classifier.predict(self.dfprod)
+        self.dfprod['yprob'] = classifier.predict_proba(self.dfprod)
+
+    # Execute production Flow
+    def production_exec(self, func_array):
+        """Execute production Flow."""
+        for func_name in func_array:
+
+            if func_name in ['encode_cathigh_set', 'encode_catlow_set',
+                             'encode_catord_set']:
+
+                encoder = self._prod_array[func_name]['encoder']
+                self.production_encode_set(encoder)
+
+            elif func_name == 'engineer_missing_set':
+
+                replace_intnan = self._prod_array[func_name]['replace_intnan']
+                self.production_missing_set(replace_intnan)
+
+            elif func_name == 'engineer_smooth_outlier':
+
+                columns = self._prod_array[func_name]['columns']
+                upper = self._prod_array[func_name]['upper']
+                lower = self._prod_array[func_name]['lower']
+                self.production_smooth_outlier(columns, upper, lower)
+
+            elif func_name == 'engineer_standardize':
+
+                columns = self._prod_array[func_name]['columns']
+                scaler = self._prod_array[func_name]['scaler']
+                self.production_standardize(columns, scaler)
+
+            elif func_name == 'engineer_missing_imputer':
+
+                for imp_object in self._prod_array[func_name]:
+
+                    columns = imp_object['columns']
+                    imputer = imp_object['imputer']
+                    self.production_missing_imputer(columns, imputer)
+
+            elif func_name == 'production_model_predict':
+
+                self.production_model_predict()

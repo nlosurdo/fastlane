@@ -1,21 +1,17 @@
-# import saspy
-import math
 import pickle
 import imblearn
 import re
 import pandas as pd
 import numpy as np
-import sklearn
 import category_encoders as ce
 import matplotlib.pyplot as plt
 import seaborn as sns
 import shap
-import os
-from tqdm import tqdm
 from BorutaShap import BorutaShap
 
-from pipiline__init__ import variables
+from Ppline_init import variables
 from fastlane.data_ingestion import obj_to_pickle, obj_from_pickle
+from fastlane.data_ingestion import pandas_profiling
 from fastlane import BinaryLane
 from sklearn.preprocessing import StandardScaler
 from sklearn.experimental import enable_iterative_imputer
@@ -25,31 +21,25 @@ from sklearn.impute import MissingIndicator
 from sklearn.inspection import permutation_importance
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import StratifiedKFold
-from sklearn.model_selection import GridSearchCV
 from sklearn.feature_selection import SelectFwe
 from sklearn.feature_selection import f_classif,chi2, mutual_info_classif
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.model_selection import GridSearchCV
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import confusion_matrix, accuracy_score
-from matplotlib.ticker import FuncFormatter
 dict_vars = variables()
 
-
 # =============================================================================
 # # <----- ----->
-# # Importing Data Container
+# # Import DataFrame and Dict of columns, Pandas Profiling
 # # <----- ----->
 # =============================================================================
-
 rootin = dict_vars['pathinp']
 rootout = dict_vars['pathout']
-subpath = '\\reporting'
-subpathII = '\\objects'
+subpath = '\\objects'
 
-fastlane = obj_from_pickle(rootout + subpathII,
-                           'dc_preprocessed.pkl')
+fastlane = obj_from_pickle(rootout + subpath, 'Boruta selector')
 
 df = fastlane.df
 dftest = fastlane.dftest
@@ -63,48 +53,48 @@ ytest = fastlane.ytest
 # # <----- ----->
 # =============================================================================
 
-subpath_ms = subpath + '\\Mdl_ModelStatistics'
+subpath_ms = '\\Machine Learning Models'
 
 model_name = 'Gradient Boosting'
 
 inner_classifier = GradientBoostingClassifier()
 
-param_grid = {'max_depth': [3, 4, 5, 7, 11],
-              'n_estimators': [100, 110, 120, 130]}
+param_grid = {'max_depth': [3, 5, 7],
+              'n_estimators': [100, 130]}
 
-score = 'roc_auc'
-
+score = 'neg_log_loss'
 
 classifier = GridSearchCV(inner_classifier,
                           param_grid=param_grid,
                           scoring=score, refit=True,
                           return_train_score=True,
-                          cv=5, n_jobs=-1)
+                          cv=2, n_jobs=-1)
 
 fastlane.model_fit_ingestion('CV Gradient Boosting',
                              classifier)
 
+fastlane.models_plots(rootout, subpath_ms)
 
 classifier = RandomForestClassifier()
 fastlane.model_fit_ingestion('Random Forest',
                              classifier)
 
-
-fastlane.models_plots(rootout, subpath_ms)
-
-
-classifier = SVC(probability=True)
-fastlane.model_fit_ingestion('Support Vector Machine',
-                             classifier)
-
-
 classifier = LogisticRegression()
 fastlane.model_fit_ingestion('Logistic Regression',
                              classifier)
 
+classifier = GradientBoostingClassifier()
+fastlane.model_fit_ingestion('Gradient Boosting Classifier',
+                             classifier)
 
-best_model = fastlane.model_set_best(mode='score_accuracy',
-                                     path=subpathII,
+fastlane.models_plots(rootout, subpath_ms)
+
+# classifier = SVC(probability=True)
+# fastlane.model_fit_ingestion('Support Vector Machine',
+#                              classifier)
+
+best_model = fastlane.model_set_best(mode='score_neg_log_loss',
+                                     path=subpath,
                                      root=rootout,
                                      filename='best_model.pkl',
                                      returns=True)
